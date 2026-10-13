@@ -86,7 +86,7 @@ async function fetchJson(url, fetchApi) {
   return response.json();
 }
 
-function createServer(fetchApi = fetch) {
+function createHandler(fetchApi = fetch) {
   const files = {
     '/': ['index.html', 'text/html; charset=utf-8'],
     '/index.html': ['index.html', 'text/html; charset=utf-8'],
@@ -97,7 +97,7 @@ function createServer(fetchApi = fetch) {
     res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(data));
   };
-  return http.createServer(async (req, res) => {
+  return async (req, res) => {
     try {
       const url = new URL(req.url, 'http://localhost');
       if (url.pathname === '/api/weather') {
@@ -169,7 +169,11 @@ function createServer(fetchApi = fetch) {
       console.error(error.message);
       json(res, 500, { error: '서버 오류가 발생했습니다.' });
     }
-  });
+  };
+}
+
+function createServer(fetchApi = fetch) {
+  return http.createServer(createHandler(fetchApi));
 }
 
 if (require.main === module) {
@@ -187,4 +191,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { createServer };
+module.exports = { createServer, createHandler };

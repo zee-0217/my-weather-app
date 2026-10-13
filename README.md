@@ -8,6 +8,8 @@
 | 프론트엔드 | `style.css` | 화면 디자인과 모바일 레이아웃 |
 | 프론트엔드 | `script.js` | 백엔드 요청, 로딩·오류·결과 표시 |
 | 백엔드 | `server.js` | 화면 제공, 외부 API 호출, 결과 반환 |
+| Vercel 백엔드 진입점 | `api/weather.js` | Vercel에서 `/api/weather` 요청을 처리 |
+| 배포 설정 | `vercel.json`, `build.js` | 서버 함수 설정과 화면 파일 복사 |
 
 HTML·CSS·JavaScript와 Node.js 기본 모듈만 사용합니다. 프레임워크, 데이터베이스, npm 패키지 설치는 필요 없습니다.
 
@@ -69,6 +71,17 @@ node server.js
 `New York`, `Los Angeles` 등 띄어쓰기 있는 이름은 전체를 검색합니다. 중복 공백을 정리하고 전체 이름이 같은 도시를 우선하며, 같은 이름이면 인구가 많은 도시를 선택합니다. 결과의 지역명을 확인하세요. 국가를 구분하려면 `Paris, France`처럼 입력할 수 있습니다.
 한국어 검색이 되지 않으면 `Seoul`, `Busan` 같은 영문 이름을 사용해 보세요.
 
+## Vercel 배포
+
+Vercel은 로컬의 `node server.js`를 계속 실행하는 방식이 아니라 `api/weather.js`를 서버 함수로 실행합니다. 화면과 API가 같은 배포 주소를 사용하므로 다른 기기에서도 조회할 수 있습니다.
+
+1. GitHub 저장소의 최신 `main` 브랜치를 배포합니다.
+2. Vercel 프로젝트의 Root Directory는 저장소 루트(비워 두거나 `.`)로 설정합니다. 저장소 안에 `weather-app` 폴더는 없습니다.
+3. Framework Preset은 **Other**, Build Command는 `node build.js`, Output Directory는 `public`로 설정합니다. 저장소의 `vercel.json`에도 이 값이 지정되어 있습니다.
+4. 재배포가 Ready 상태가 되면 배포 주소에서 도시를 검색합니다. `/api/weather?city=Seoul` 주소가 JSON 날씨 정보를 반환하는지도 확인할 수 있습니다.
+
+별도 API Key나 환경 변수는 필요 없습니다. Node.js 버전은 배포 시 22.x를 사용합니다. 배포된 서비스를 사용하는 기기에는 Node.js 설치가 필요 없습니다.
+
 ## 변경 사항 검증
 
-`node --test server.test.js`로 전체 도시 이름 검색, 주변 명소 사진 조회, 사진 서비스 장애 시 날씨 유지 동작을 검증할 수 있습니다. 테스트는 외부 API를 호출하지 않습니다.
+`node --test server.test.js`로 전체 도시 이름 검색, 주변 명소 사진 조회, 사진 서비스 장애 시 날씨 유지, Vercel API 진입점 동작을 검증할 수 있습니다. 테스트는 외부 API를 호출하지 않습니다.

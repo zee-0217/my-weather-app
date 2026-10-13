@@ -105,6 +105,9 @@ form.addEventListener('submit', async event => {
   status.textContent = '현재 날씨를 불러오는 중입니다…';
   try {
     const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
+    if (!response.headers.get('content-type')?.includes('application/json')) {
+      throw new Error('날씨 API가 정상적으로 배포되지 않았습니다. 관리자에게 문의해 주세요.');
+    }
     const weather = await response.json();
     if (!response.ok) throw new Error(weather.error || '날씨 조회에 실패했습니다.');
     showCityBackground(weather.background);
@@ -133,7 +136,9 @@ form.addEventListener('submit', async event => {
     status.textContent = '날씨를 불러왔습니다.';
   } catch (error) {
     status.textContent = error instanceof TypeError || error instanceof SyntaxError
-      ? '서버에 연결할 수 없습니다. node server.js로 실행한 뒤 서버 주소로 접속해 주세요.'
+      ? (['localhost', '127.0.0.1', ''].includes(window.location.hostname)
+        ? '서버에 연결할 수 없습니다. node server.js로 실행한 뒤 서버 주소로 접속해 주세요.'
+        : '날씨 서비스에 연결할 수 없습니다. 인터넷 연결을 확인하고 잠시 후 다시 시도해 주세요.')
       : error.message;
   } finally {
     button.disabled = false;

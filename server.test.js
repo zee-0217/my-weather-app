@@ -1,6 +1,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createServer } = require('./server');
+const http = require('node:http');
+
+test('Vercel entry point handles API requests without starting a listener on import', async () => {
+  const handler = require('./api/weather');
+  assert.equal(typeof handler, 'function');
+  const server = http.createServer(handler);
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/weather?city=`);
+    assert.equal(response.status, 400);
+    assert.match(response.headers.get('content-type'), /application\/json/);
+    assert.equal(typeof (await response.json()).error, 'string');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
 
 async function requestWeather(mock, city) {
   const server = createServer(mock);
