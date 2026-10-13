@@ -5,6 +5,69 @@ const path = require('node:path');
 
 // 도시 검색 서비스에서 인식하지 못하는 대표적인 한국어 이름을 보완합니다.
 const cityNames = { '서울': 'Seoul', '서울시': 'Seoul', '서울특별시': 'Seoul', '부산': 'Busan', '인천': 'Incheon', '대구': 'Daegu', '대전': 'Daejeon', '광주': 'Gwangju', '울산': 'Ulsan', '제주': 'Jeju', '수원': 'Suwon' };
+Object.assign(cityNames, { '뉴욕': 'New York', '뉴욕시': 'New York', '로스앤젤레스': 'Los Angeles', '샌프란시스코': 'San Francisco', '런던': 'London', '파리': 'Paris', '도쿄': 'Tokyo', '오사카': 'Osaka', '방콕': 'Bangkok', '싱가포르': 'Singapore', '홍콩': 'Hong Kong', '시드니': 'Sydney' });
+
+const normalizeName = name => name.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en');
+
+function selectCity(results = [], searchName) {
+  const fullName = normalizeName(searchName.split(',')[0]);
+  const exact = results.filter(place => normalizeName(place.name) === fullName);
+  return (exact.length ? exact.sort((a, b) => (b.population || 0) - (a.population || 0)) : results)[0];
+}
+
+function photoFromPage(page, place) {
+  const image = page.originalimage?.source || page.thumbnail?.source;
+  if (!image) return null;
+  const imageUrl = new URL(image);
+  if (imageUrl.protocol !== 'https:' || !['upload.wikimedia.org', 'thumb.wikimedia.org'].includes(imageUrl.hostname)) return null;
+  const parts = imageUrl.pathname.split('/commons/')[1]?.split('/');
+  const filename = parts?.[parts[0] === 'thumb' ? 3 : 2];
+  if (!filename) return null;
+  return {
+    url: imageUrl.href,
+    sourceUrl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(decodeURIComponent(filename))}`,
+    title: `${place.name} · ${page.title || '대표 사진'}`,
+  };
+}
+
+async function findCityPhoto(place, fetchApi) {
+  const options = { headers: { 'User-Agent': 'LocalCityWeather/1.0 (personal educational weather app)' }, signal: AbortSignal.timeout(8000) };
+  // 도시 이름과 문서 제목이 다른 대표 사례를 보완합니다.
+  const titles = { 'New York': 'New York City', 'Hong Kong': 'Hong Kong', 'Washington': 'Washington, D.C.' };
+  const title = Object.hasOwn(titles, place.name) ? titles[place.name] : place.name;
+  try {
+    const response = await fetchApi(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`, options);
+    if (response.ok) {
+      const page = await response.json();
+      const coords = page.coordinates;
+      if (coords && Math.abs(coords.lat - place.latitude) < 0.3 && Math.abs(coords.lon - place.longitude) < 0.3) {
+        const photo = photoFromPage(page, place);
+        if (photo) return photo;
+      }
+    }
+  } catch { /* 제목 검색 실패 시 좌표로 다시 검색합니다. */ }
+
+  try {
+    const nearby = new URL('https://en.wikipedia.org/w/api.php');
+    nearby.search = new URLSearchParams({ action: 'query', format: 'json', formatversion: '2',
+      generator: 'geosearch', ggscoord: `${place.latitude}|${place.longitude}`, ggsradius: '10000', ggslimit: '15', ggsnamespace: '0',
+      prop: 'pageimages|coordinates', piprop: 'thumbnail', pithumbsize: '1280', pilicense: 'free', colimit: 'max' });
+    const response = await fetchApi(nearby, { ...options, signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const pages = (data.query?.pages || []).filter(page => page.thumbnail && page.coordinates?.length);
+    // 검색된 도시 가까이 있는 명소 사진을 우선합니다.
+    pages.sort((a, b) => {
+      const distance = page => (page.coordinates[0].lat - place.latitude) ** 2 + (Math.cos(place.latitude * Math.PI / 180) * (page.coordinates[0].lon - place.longitude)) ** 2;
+      return distance(a) - distance(b);
+    });
+    for (const page of pages) {
+      const photo = photoFromPage(page, place);
+      if (photo) return photo;
+    }
+  } catch { /* 외부 사진 서비스 오류는 날씨 조회에 영향을 주지 않습니다. */ }
+  return null;
+}
 
 const descriptions = {
   0: '맑음', 1: '대체로 맑음', 2: '부분적으로 흐림', 3: '흐림',
@@ -42,14 +105,15 @@ function createServer(fetchApi = fetch) {
           res.setHeader('Allow', 'GET');
           return json(res, 405, { error: 'GET 요청만 지원합니다.' });
         }
-        const city = (url.searchParams.get('city') || '').trim();
+        const city = (url.searchParams.get('city') || '').normalize('NFKC').trim().replace(/\s+/g, ' ');
         if (city.length < 2 || city.length > 100) return json(res, 400, { error: '도시 이름을 2~100자로 입력해 주세요.' });
         try {
           const search = new URL('https://geocoding-api.open-meteo.com/v1/search');
           const searchName = Object.hasOwn(cityNames, city) ? cityNames[city] : city;
-          search.search = new URLSearchParams({ name: searchName, count: '1', language: 'ko', format: 'json' });
+          // 한국어 응답에서 New York 등 일부 도시가 누락되어 영문 이름으로 조회합니다.
+          search.search = new URLSearchParams({ name: searchName, count: '10', language: 'en', format: 'json' });
           const places = await fetchJson(search, fetchApi);
-          const place = places.results?.[0];
+          const place = selectCity(places.results, searchName);
           if (!place) return json(res, 404, { error: '도시를 찾지 못했습니다. 영문 이름이나 다른 도시 이름으로 다시 검색해 주세요.' });
           if (!Number.isFinite(place.latitude) || !Number.isFinite(place.longitude)) throw new Error('잘못된 도시 좌표');
           const forecast = new URL('https://api.open-meteo.com/v1/forecast');
@@ -64,36 +128,7 @@ function createServer(fetchApi = fetch) {
           if (!current || !Number.isFinite(current.temperature_2m) || typeof current.time !== 'string' || typeof data.timezone !== 'string') throw new Error('날씨 데이터 누락');
           // 도시 문서의 좌표가 검색된 도시와 가까울 때만 대표 사진을 사용합니다.
           // 사진 서비스 오류가 나더라도 날씨 조회는 계속 제공합니다.
-          let background = null;
-          try {
-            const imageSearch = new URL(search);
-            imageSearch.searchParams.set('language', 'en');
-            const imagePlaces = await fetchJson(imageSearch, fetchApi);
-            const englishPlace = imagePlaces.results?.find(item => item.id === place.id);
-            const imageName = englishPlace?.name || searchName;
-            const article = await fetchApi(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(imageName)}`, {
-              signal: AbortSignal.timeout(5000),
-              headers: { 'User-Agent': 'LocalCityWeather/1.0 (personal educational weather app)' },
-            });
-            if (article.ok) {
-              const page = await article.json();
-              const coords = page.coordinates;
-              const image = page.originalimage?.source || page.thumbnail?.source;
-              if (coords && Math.abs(coords.lat - place.latitude) < 0.8 && Math.abs(coords.lon - place.longitude) < 0.8 && image) {
-                const imageUrl = new URL(image);
-                if (imageUrl.protocol === 'https:' && ['upload.wikimedia.org', 'thumb.wikimedia.org'].includes(imageUrl.hostname)) {
-                  const parts = imageUrl.pathname.split('/commons/')[1]?.split('/');
-                  const filename = parts?.[parts[0] === 'thumb' ? 3 : 2];
-                  if (filename) background = {
-                    url: imageUrl.href,
-                    sourceUrl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(decodeURIComponent(filename))}`,
-                    title: `${place.name} 대표 사진`,
-                  };
-                }
-              }
-            }
-          } catch { /* 사진이 없으면 기본 배경을 사용합니다. */ }
-          // UTC로 바꾸지 않고 해당 도시의 현재 날짜를 기준으로 다음 날을 찾습니다.
+          const background = await findCityPhoto(place, fetchApi);
           const nextDate = new Date(`${current.time.slice(0, 10)}T00:00:00Z`);
           nextDate.setUTCDate(nextDate.getUTCDate() + 1);
           const tomorrowDate = nextDate.toISOString().slice(0, 10);
