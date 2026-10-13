@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>도시 날씨</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <img id="city-background" class="city-background" alt="" aria-hidden="true" hidden>
+  <main>
+    <p class="eyebrow">CITY WEATHER</p>
+    <h1><span aria-hidden="true">🌤️</span> 지금, 그 도시의 날씨</h1>
+    <p class="intro">궁금한 도시의 현재 날씨를 확인해 보세요.</p>
+    <form id="weather-form">
+      <label for="city"><span aria-hidden="true">🏙️</span> 도시 이름</label>
+      <div class="search">
+        <input id="city" name="city" placeholder="예: 서울, 부산, London" maxlength="100" required autocomplete="off" aria-describedby="hint">
+        <button type="submit"><span aria-hidden="true">🔎</span> 날씨 확인</button>
+      </div>
+      <p id="hint">검색되지 않으면 영문 도시 이름으로 입력해 보세요.</p>
+    </form>
+    <p id="status" role="status">도시 이름을 입력해 주세요.</p>
+    <section id="result" aria-labelledby="location" hidden>
+      <h2 id="location"></h2>
+      <p class="condition"><span id="condition-icon" class="weather-icon" aria-hidden="true"></span> <span id="condition"></span></p>
+      <p id="temperature" class="temperature"></p>
+      <dl>
+        <div><dt><span aria-hidden="true">🌡️</span> 체감온도</dt><dd id="feels-like"></dd></div>
+        <div><dt><span aria-hidden="true">💧</span> 습도</dt><dd id="humidity"></dd></div>
+        <div><dt><span aria-hidden="true">🍃</span> 풍속</dt><dd id="wind"></dd></div>
+        <div><dt><span aria-hidden="true">☔</span> <span id="precipitation-label">현재 강수량</span></dt><dd id="precipitation"></dd></div>
+      </dl>
+      <p id="updated" class="muted"></p>
+      <div class="outfit" aria-labelledby="outfit-title">
+        <h3 id="outfit-title"><span aria-hidden="true">👕</span> 지금 추천 옷차림</h3>
+        <p id="outfit-current"></p>
+        <p class="muted">체감온도 기준의 간단한 추천이에요. 활동량과 추위를 타는 정도에 맞춰 조절해 주세요.</p>
+      </div>
+      <div class="tomorrow" aria-labelledby="tomorrow-title">
+        <h3 id="tomorrow-title"><span aria-hidden="true">🗓️</span> 내일 날씨 (예상)</h3>
+        <p id="tomorrow-date" class="muted"></p>
+        <p class="condition"><span id="tomorrow-icon" class="weather-icon" aria-hidden="true"></span> <span id="tomorrow-condition"></span></p>
+        <dl>
+          <div><dt><span aria-hidden="true">🔆</span> 최고 기온</dt><dd id="tomorrow-max"></dd></div>
+          <div><dt><span aria-hidden="true">🧊</span> 최저 기온</dt><dd id="tomorrow-min"></dd></div>
+          <div><dt><span aria-hidden="true">🌧️</span> 예상 강수량 (하루 합계)</dt><dd id="tomorrow-precipitation"></dd></div>
+          <div><dt><span aria-hidden="true">☂️</span> 강수 확률 (하루 중 최대)</dt><dd id="tomorrow-probability"></dd></div>
+        </dl>
+        <p class="muted">예보는 해당 도시의 날짜 기준이며, 이후 변경될 수 있습니다.</p>
+        <div class="outfit" aria-labelledby="tomorrow-outfit-title">
+          <h3 id="tomorrow-outfit-title"><span aria-hidden="true">🧥</span> 내일 추천 옷차림</h3>
+          <p id="outfit-tomorrow"></p>
+          <p class="muted">최고·최저 기온을 함께 참고한 추천이에요.</p>
+        </div>
+      </div>
+    </section>
+    <footer>
+      <p id="photo-credit" hidden>배경 사진: <a id="photo-source" target="_blank" rel="noopener noreferrer">Wikimedia Commons · 저작자 및 이용 조건</a></p>
+      날씨 데이터: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> ·
+      도시 데이터: <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a>
+      <p>현재 날씨는 기상 모델 기반 데이터입니다. 검색 결과의 첫 번째 지역을 표시합니다.</p>
+    </footer>
+  </main>
+</body>
+</html>
